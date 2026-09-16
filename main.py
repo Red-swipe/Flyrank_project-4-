@@ -1,4 +1,6 @@
-from fastapi import FastAPI, HTTPException, Response, Depends
+from fastapi import FastAPI, HTTPException, Response, Depends, Header
+from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBearer, Security
 from dotenv import load_dotenv
 import os
 from supabase import create_client
@@ -11,10 +13,12 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-app = FastAPI()
+app = FastAPI(title="FlyRank Auth API")
+
+bearer_scheme = HTTPBearer()
 
 
-def verify_token(authorization: str = None):
+def verify_token(authorization: str = Header(None)):
     """
     FastAPI dependency that extracts and verifies a Bearer token from the
     Authorization header using Supabase.
@@ -76,7 +80,7 @@ async def signup(request: SignupRequest):
     try:
         response = supabase_client.auth.sign_up({"email": email, "password": password})
         # Return the user object from Supabase response with 201 status
-        return Response({"user": response.user}, status_code=201)
+        return JSONResponse(content={"user": str(response.user)}, status_code=201)
     except Exception as e:
         # Return Supabase error message
         raise HTTPException(status_code=400, detail=str(e))
@@ -107,7 +111,7 @@ async def public_info():
 
 
 @app.get("/protected/profile")
-async def protected_profile(current_user = Depends(verify_token)):
+async def protected_profile(current_user=Depends(verify_token), _=Security(bearer_scheme)):
     return {
         "id": current_user.id,
         "email": current_user.email,
@@ -116,13 +120,13 @@ async def protected_profile(current_user = Depends(verify_token)):
 
 
 @app.post("/auth/logout")
-async def auth_logout(current_user = Depends(verify_token)):
+async def auth_logout(current_user=Depends(verify_token), _=Security(bearer_scheme)):
     supabase_client.auth.sign_out()
     return Response(status_code=204)
 
 
 @app.get("/protected/dashboard")
-async def protected_dashboard(current_user = Depends(verify_token)):
+async def protected_dashboard(current_user=Depends(verify_token), _=Security(bearer_scheme)):
     return {
         "message": "Welcome to the dashboard",
         "user_id": current_user.id,
