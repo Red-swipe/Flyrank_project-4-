@@ -78,11 +78,28 @@ async def protected_profile(authorization: str = None):
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Access token required")
     token = authorization[len("Bearer "):]
-    token_preview = token[:10] if len(token) >= 10 else token
-    return {
-        "message": "Token received, not yet verified",
-        "token_preview": token_preview,
-    }
+    try:
+        # Supabase auth.get_user(access_token) validates the Bearer token
+        # Returns structure varies by SDK version - commonly {"user": User, "session": Session} dict,
+        # or just the User object directly. We handle both patterns.
+        sup_response = supabase_client.auth.get_user(token)
+        # Normalize to access the user object
+        if hasattr(sup_response, "user"):
+            user = sup_response.user  # Pattern: sup_response = {"user": user_obj, ...}
+        elif isinstance(sup_response, dict) and "user" in sup_response:
+            user = sup_response["user"]  # Dict pattern
+        else:
+            user = sup_response  # Assume direct User object
+        if user is None:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        # Return user profile data - assuming User has: id, email, created_at attributes
+        return {
+            "id": user.id,
+            "email": user.email,
+            "created_at": user.created_at,
+        }
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 
 if __name__ == "__main__":
