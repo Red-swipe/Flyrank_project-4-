@@ -66,6 +66,25 @@ async def login(request: LoginRequest):
         raise HTTPException(status_code=401, detail="Invalid login credentials")
 
 
+@app.get("/public/info")
+async def public_info():
+    return {"message": "Welcome stranger! This info is public."}
+
+
+@app.get("/protected/profile")
+async def protected_profile(authorization: str = None):
+    if authorization is None:
+        raise HTTPException(status_code=401, detail="Access token required")
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Access token required")
+    token = authorization[len("Bearer "):]
+    token_preview = token[:10] if len(token) >= 10 else token
+    return {
+        "message": "Token received, not yet verified",
+        "token_preview": token_preview,
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
 
