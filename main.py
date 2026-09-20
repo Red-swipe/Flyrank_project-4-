@@ -1,6 +1,6 @@
-from fastapi import FastAPI, HTTPException, Response, Depends, Header
+from fastapi import FastAPI, HTTPException, Response, Depends
 from fastapi.responses import JSONResponse
-from fastapi.security import HTTPBearer, Security
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from dotenv import load_dotenv
 import os
 from supabase import create_client
@@ -15,23 +15,18 @@ supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 app = FastAPI(title="FlyRank Auth API")
 
-bearer_scheme = HTTPBearer()
+security = HTTPBearer()
 
 
-def verify_token(authorization: str = Header(None)):
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
-    FastAPI dependency that extracts and verifies a Bearer token from the
-    Authorization header using Supabase.
+    FastAPI dependency that extracts and verifies a Bearer token using Supabase.
 
     - If header is missing or doesn't start with 'Bearer ' → raises 401
     - If token is invalid/expired → raises 401
     - If valid → returns the user object
     """
-    if authorization is None:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    token = authorization[len("Bearer "):]
+    token = credentials.credentials
     try:
         # Supabase auth.get_user(access_token) validates the Bearer token
         # Returns structure varies by SDK version - commonly {"user": User, "session": Session} dict,
@@ -111,7 +106,7 @@ async def public_info():
 
 
 @app.get("/protected/profile")
-async def protected_profile(current_user=Depends(verify_token), _=Security(bearer_scheme)):
+async def protected_profile(current_user=Depends(verify_token)):
     return {
         "id": current_user.id,
         "email": current_user.email,
@@ -120,13 +115,13 @@ async def protected_profile(current_user=Depends(verify_token), _=Security(beare
 
 
 @app.post("/auth/logout")
-async def auth_logout(current_user=Depends(verify_token), _=Security(bearer_scheme)):
+async def auth_logout(current_user=Depends(verify_token)):
     supabase_client.auth.sign_out()
     return Response(status_code=204)
 
 
 @app.get("/protected/dashboard")
-async def protected_dashboard(current_user=Depends(verify_token), _=Security(bearer_scheme)):
+async def protected_dashboard(current_user=Depends(verify_token)):
     return {
         "message": "Welcome to the dashboard",
         "user_id": current_user.id,
