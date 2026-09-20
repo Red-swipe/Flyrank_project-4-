@@ -44,4 +44,4 @@ Swagger docs at [http://localhost:8000/docs](http://localhost:8000/docs).
 
 ## Swagger UI
 
-![Swagger UI](swagger_ui.png)
+![Swagger UI](swagger-ui.png)
